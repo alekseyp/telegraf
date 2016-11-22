@@ -42,7 +42,7 @@ func TestNewGaugeMetric(t *testing.T) {
 		"usage_idle": float64(99),
 		"usage_busy": float64(1),
 	}
-	m, err := NewGaugeMetric("cpu", tags, fields, now)
+	m, err := NewMetric("cpu", tags, fields, now, Gauge)
 	assert.NoError(t, err)
 
 	assert.Equal(t, Gauge, m.Type())
@@ -64,7 +64,7 @@ func TestNewCounterMetric(t *testing.T) {
 		"usage_idle": float64(99),
 		"usage_busy": float64(1),
 	}
-	m, err := NewCounterMetric("cpu", tags, fields, now)
+	m, err := NewMetric("cpu", tags, fields, now, Counter)
 	assert.NoError(t, err)
 
 	assert.Equal(t, Counter, m.Type())
@@ -87,13 +87,9 @@ func TestNewMetricString(t *testing.T) {
 	m, err := NewMetric("cpu", tags, fields, now)
 	assert.NoError(t, err)
 
-	lineProto := fmt.Sprintf("cpu,host=localhost usage_idle=99 %d",
+	lineProto := fmt.Sprintf("cpu,host=localhost usage_idle=99 %d\n",
 		now.UnixNano())
 	assert.Equal(t, lineProto, m.String())
-
-	lineProtoPrecision := fmt.Sprintf("cpu,host=localhost usage_idle=99 %d",
-		now.Unix())
-	assert.Equal(t, lineProtoPrecision, m.PrecisionString("s"))
 }
 
 func TestNewMetricFailNaN(t *testing.T) {
@@ -107,5 +103,5 @@ func TestNewMetricFailNaN(t *testing.T) {
 	}
 
 	_, err := NewMetric("cpu", tags, fields, now)
-	assert.Error(t, err)
+	assert.NoError(t, err)
 }

@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/influxdata/telegraf"
-
-	"github.com/influxdata/influxdb/models"
 )
 
 // InfluxParser is an object for Parsing incoming metrics.
@@ -19,18 +17,16 @@ type InfluxParser struct {
 func (p *InfluxParser) ParseWithDefaultTime(buf []byte, t time.Time) ([]telegraf.Metric, error) {
 	// parse even if the buffer begins with a newline
 	buf = bytes.TrimPrefix(buf, []byte("\n"))
-	points, err := models.ParsePointsWithPrecision(buf, t, "n")
-	metrics := make([]telegraf.Metric, len(points))
-	for i, point := range points {
-		for k, v := range p.DefaultTags {
-			// only set the default tag if it doesn't already exist:
-			if tmp := point.Tags().GetString(k); tmp == "" {
-				point.AddTag(k, v)
+	metrics, err := telegraf.ParseWithDefaultTime(buf, t)
+	if len(p.DefaultTags) > 0 {
+		for _, metric := range metrics {
+			for k, v := range p.DefaultTags {
+				// only set the default tag if it doesn't already exist:
+				if !metric.HasTag(k) {
+					metric.AddTag(k, v)
+				}
 			}
 		}
-		// Ignore error here because it's impossible that a model.Point
-		// wouldn't parse into client.Point properly
-		metrics[i] = telegraf.NewMetricFromPoint(point)
 	}
 	return metrics, err
 }

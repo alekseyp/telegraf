@@ -1,6 +1,7 @@
 package instrumental
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"log"
@@ -13,6 +14,11 @@ import (
 	"github.com/influxdata/telegraf/plugins/outputs"
 	"github.com/influxdata/telegraf/plugins/serializers"
 	"github.com/influxdata/telegraf/plugins/serializers/graphite"
+)
+
+var (
+	ValueIncludesBadChar = regexp.MustCompile("[^[:digit:].]")
+	MetricNameReplacer   = regexp.MustCompile("[^-[:alnum:]_.]+")
 )
 
 type Instrumental struct {
@@ -32,11 +38,6 @@ const (
 	HelloMessage    = "hello version go/telegraf/1.1\n"
 	AuthFormat      = "authenticate %s\n"
 	HandshakeFormat = HelloMessage + AuthFormat
-)
-
-var (
-	ValueIncludesBadChar = regexp.MustCompile("[^[:digit:].]")
-	MetricNameReplacer   = regexp.MustCompile("[^-[:alnum:]_.]+")
 )
 
 var sampleConfig = `
@@ -117,7 +118,7 @@ func (i *Instrumental) Write(metrics []telegraf.Metric) error {
 			metric.Time(),
 		)
 
-		stats, err := s.Serialize(toSerialize)
+		buf, err := s.Serialize(toSerialize)
 		if err != nil {
 			log.Printf("E! Error serializing a metric to Instrumental: %s", err)
 		}
@@ -131,7 +132,14 @@ func (i *Instrumental) Write(metrics []telegraf.Metric) error {
 			metricType = "gauge"
 		}
 
-		for _, stat := range stats {
+		buffer := bytes.NewBuffer(buf)
+		for {
+			line, err := buffer.ReadBytes('\n')
+			if err != nil {
+				break
+			}
+			stat := string(line)
+
 			// decompose "metric.name value time"
 			splitStat := strings.SplitN(stat, " ", 3)
 			metric := splitStat[0]
@@ -143,16 +151,12 @@ func (i *Instrumental) Write(metrics []telegraf.Metric) error {
 
 			if !ValueIncludesBadChar.MatchString(value) {
 				points = append(points, fmt.Sprintf("%s %s %s %s", metricType, clean_metric, value, time))
-			} else if i.Debug {
-				log.Printf("E! Instrumental unable to send bad stat: %s", stat)
 			}
 		}
 	}
 
 	allPoints := strings.Join(points, "\n") + "\n"
 	_, err = fmt.Fprintf(i.conn, allPoints)
-
-	log.Println("D! Instrumental: " + allPoints)
 
 	if err != nil {
 		if err == io.EOF {

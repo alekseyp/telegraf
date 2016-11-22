@@ -135,16 +135,7 @@ func makemetric(
 		}
 	}
 
-	var m telegraf.Metric
-	var err error
-	switch mType {
-	case telegraf.Counter:
-		m, err = telegraf.NewCounterMetric(measurement, tags, fields, t)
-	case telegraf.Gauge:
-		m, err = telegraf.NewGaugeMetric(measurement, tags, fields, t)
-	default:
-		m, err = telegraf.NewMetric(measurement, tags, fields, t)
-	}
+	m, err := telegraf.NewMetric(measurement, tags, fields, t, mType)
 	if err != nil {
 		log.Printf("Error adding point [%s]: %s\n", measurement, err.Error())
 		return nil
